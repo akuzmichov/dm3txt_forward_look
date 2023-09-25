@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import sys
 from math import sqrt, asin, degrees
+from os import path
 
 
 def set_new_yaw_angle(i, angle):
@@ -12,7 +14,7 @@ def set_new_yaw_angle(i, angle):
             lines[i + 2] = new_yaw_line
             return
         else:                                      # if only pitch is set
-            #lines.insert(i + 2, new_yaw_line) # Adding a line breaks dm3 structure
+            #lines.insert(i + 2, new_yaw_line)     # Adding a line breaks dm3 structure
             return
     if lines[i + 1][:15] == '   viewangles[1':     # if only yaw (old) is set
         lines[i + 1] = new_yaw_line
@@ -53,41 +55,53 @@ def set_direction_angle(i, vx=None, vy=None):
 
 
 def iter_lines():
-	global lines
-	prev_vx, prev_vy = 0, 0
-	for i, l in enumerate(lines):
-		if l[:13] == '   velocity[0':                # If vx changed,
-			if lines[i + 1][:13] == '   velocity[1': # and vy changed too
-				continue                             # will process with next line.
-			else:                                    # If only vx changed, call set_direction_angle with vx only.
-				set_direction_angle(i=i, vx=float(l.split(' ')[-1][:-1]))
-				continue
-		if l[:13] == '   velocity[1':                # If vy changed
-			if lines[i - 1][:13] == '   velocity[0': # and vx changed too
-				set_direction_angle(i=i,             # call set_direction_angle with both vx and vy.
-									vx=float(lines[i - 1].split(' ')[-1][:-1]),
-									vy=float(l.split(' ')[-1][:-1]))
-				continue
-			else:                                    # If only vy changed, call set_direction_angle with vy only.
-				set_direction_angle(i=i, vy=float(l.split(' ')[-1][:-1]))
-				continue
-		if l[:15] == '   viewangles[1': 
-			# If yaw angle changed, but none of (vx, vy) changed (e.g. during some jumps),
-			# then call set_direction_angle with prev_vx & prev_vy
-			if not '   velocity' in [lines[i - 3][:11], lines[i - 2][:11], lines[i - 1][:11]]:
-				set_direction_angle(i=i, vx=prev_vx, vy=prev_vy)
+    global lines
+    prev_vx, prev_vy = 0, 0
+    for i, l in enumerate(lines):
+        if l[:13] == '   velocity[0':                # If vx changed,
+            if lines[i + 1][:13] == '   velocity[1': # and vy changed too
+                continue                             # will process with next line.
+            else:                                    # If only vx changed, call set_direction_angle with vx only.
+                set_direction_angle(i=i, vx=float(l.split(' ')[-1][:-1]))
+                continue
+        if l[:13] == '   velocity[1':                # If vy changed
+            if lines[i - 1][:13] == '   velocity[0': # and vx changed too
+                set_direction_angle(i=i,             # call set_direction_angle with both vx and vy.
+                                    vx=float(lines[i - 1].split(' ')[-1][:-1]),
+                                    vy=float(l.split(' ')[-1][:-1]))
+                continue
+            else:                                    # If only vy changed, call set_direction_angle with vy only.
+                set_direction_angle(i=i, vy=float(l.split(' ')[-1][:-1]))
+                continue
+        if l[:15] == '   viewangles[1': 
+            # If yaw angle changed, but none of (vx, vy) changed (e.g. during some jumps),
+            # then call set_direction_angle with prev_vx & prev_vy
+            if not '   velocity' in [lines[i - 3][:11], lines[i - 2][:11], lines[i - 1][:11]]:
+                set_direction_angle(i=i, vx=prev_vx, vy=prev_vy)
 
 
 if __name__ == '__main__':
+    # Iterate through all given filename arguments
+    for dm3_txt_file in sys.argv[1:]:
+        # Read file
+        try:
+            f = open(dm3_txt_file, 'r')
+            demo_txt = f.read()
+        except FileNotFoundError:
+            print('File {} not found.'.format(dm3_txt_file))
+            continue
 
-	lines = []
-	with open('g:\GAMES\dfbots\lmpc\lmpc344m\\bin\dfwc2017-3wiz.txt', 'r') as f:
-		demo_txt = f.read()
-		lines = demo_txt.split('\n')
-		
-	iter_lines()
+        # Process lines and set new yaw angles
+        print('Processing file {}... '.format(dm3_txt_file), end='')
+        lines = demo_txt.split('\n')
+        iter_lines()
 
-	lines_to_save = '\n'.join(lines)
-	with open('g:\GAMES\dfbots\lmpc\lmpc344m\\bin\dfwc2017-3wiz_fkey_new.txt', 'w') as f:
-		f.write(lines_to_save)
+        # Save new file
+        lines_to_save = '\n'.join(lines)
+        filename, extension = path.splitext(dm3_txt_file)
+        file_to_save = filename + '(forwardlook)' + extension
+        with open(file_to_save, 'w') as f:
+            f.write(lines_to_save)
+        print('Saved output as {}'.format(file_to_save))
 
+    print('Finished successfully.')
